@@ -53,10 +53,10 @@ class App {
                             console.log(' [App] Service start failed.', err);
                         } else {
                             console.log(' [App] Service start failed with critical error. Connection will be closed.', err);
+                        }
 
-                            if (!isConnectionClosed) {
-                                conn.close();
-                            }
+                        if (!isConnectionClosed) {
+                            conn.close();
                         }
                     });
             })
