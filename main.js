@@ -3,8 +3,16 @@ var Service = require('./service');
 
 function startService(conn) {
     var service = new Service(conn);
-    service.start();
-    return service;
+    return service.start()
+        .then(() => {
+            conn.createChannel()
+                .then(ch => {
+                    for (var i = 0; i < 10; i++) {
+                        ch.sendToQueue('reconnect_in', new Buffer('hello'));
+                    }
+                })
+        })
+        .then(() => service);
 }
 
 //var app = new App(startService);
