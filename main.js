@@ -1,8 +1,9 @@
 var App = require('./app');
 var Service = require('./service');
+var ConfirmService = require('./confirmService');
 
 function startService(conn) {
-    var service = new Service(conn);
+    var service = new ConfirmService(conn);
     return service.start()
         .then(() => {
             conn.createChannel()
