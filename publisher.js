@@ -1,4 +1,4 @@
-var EventEmitter = require('events').EventEmitter;
+const EventEmitter = require('events').EventEmitter;
 
 class ReadyState {
     constructor(publisher, ch) {

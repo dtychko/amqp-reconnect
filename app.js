@@ -22,8 +22,8 @@ class App {
     _connectAndStartService() {
         this._connect()
             .then(conn => {
-                var reconnecting = false;
-                var isConnectionClosed = false;
+                let reconnecting = false;
+                let isConnectionClosed = false;
 
                 conn.on('error', err => {
                     console.error(` [App] Connection error.`, err);
@@ -88,7 +88,7 @@ class App {
                     return Promise.reject('Reconnect attempt limit exceeded');
                 }
 
-                var ms = this._getTimeout(attempt);
+                const ms = this._getTimeout(attempt);
 
                 console.log(` [App] Next attempt in ${ms} ms`);
 

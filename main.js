@@ -1,14 +1,14 @@
-var App = require('./app');
-var Service = require('./service');
-var ConfirmService = require('./confirmService');
+const App = require('./app');
+const Service = require('./service');
+const ConfirmService = require('./confirmService');
 
 function startService(conn) {
-    var service = new ConfirmService(conn);
+    const service = new ConfirmService(conn);
     return service.start()
         .then(() => {
             conn.createChannel()
                 .then(ch => {
-                    for (var i = 0; i < 10; i++) {
+                    for (let i = 0; i < 10; i++) {
                         ch.sendToQueue('reconnect_in', new Buffer('hello'));
                     }
                 })
@@ -16,8 +16,8 @@ function startService(conn) {
         .then(() => service);
 }
 
-//var app = new App(startService);
-//var app = new App(startService, 3000, 10);
-var app = new App(startService, attempt => attempt * 2000, 5);
+//const app = new App(startService);
+//const app = new App(startService, 3000, 10);
+const app = new App(startService, attempt => attempt * 2000, 5);
 
 app.run();
