@@ -28,8 +28,8 @@ class ReadyState {
         this._publisher.emit('empty');
     }
 
-    _send(message) {
-        return this._ch.sendToQueue(message.queueName, message.content, message.options);
+    _send({exchangeName, queueName, content, options, callback}) {
+        return this._ch.publish(exchangeName, queueName, content, options, callback);
     }
 
     _goPendingState(buffer = []) {
@@ -37,6 +37,7 @@ class ReadyState {
         console.log(` [Publisher] Switched to PendingState (buffer size: ${buffer.length})`);
     }
 }
+
 
 class PendingState {
     constructor(publisher, ch, buffer = []) {
@@ -55,8 +56,10 @@ class PendingState {
 
     publish(message) {
         this._buffer.push(message);
+
     }
 }
+
 
 class Publisher extends EventEmitter {
     constructor(ch) {
@@ -64,8 +67,12 @@ class Publisher extends EventEmitter {
         this._state = new ReadyState(this, ch);
     }
 
-    publish(queueName, content, options) {
-        this._state.publish({queueName, content, options});
+    publish(exchangeName, queueName, content, options, callback) {
+        this._state.publish({exchangeName, queueName, content, options, callback});
+    }
+
+    sendToQueue(queueName, content, options, callback) {
+        this.publish('', queueName, content, options, callback);
     }
 
     _setState(state) {
@@ -73,4 +80,32 @@ class Publisher extends EventEmitter {
     }
 }
 
-module.exports = Publisher;
+
+class ConfirmPublisher extends Publisher {
+    publish(exchangeName, queueName, content, options) {
+        return new Promise((res, rej) => {
+            super.publish(
+                exchangeName,
+                queueName,
+                content,
+                options,
+                err => {
+                    if (err) {
+                        rej(err);
+                    } else {
+                        res();
+                    }
+                }
+            )
+        });
+    }
+
+    sendToQueue(queueName, content, options) {
+        return this.publish('', queueName, content, options);
+    }
+}
+
+module.exports = {
+    Publisher,
+    ConfirmPublisher
+};

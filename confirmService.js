@@ -1,5 +1,6 @@
 const {timeout, logErrors} = require('./utils');
 const Service = require('./Service');
+const {ConfirmPublisher} = require('./publisher');
 
 class ConfirmService extends Service {
     constructor(conn) {
@@ -10,11 +11,13 @@ class ConfirmService extends Service {
         return Promise.all([this._conn.createConfirmChannel(),
             this._conn.createChannel()])
             .then(([confirmCh, ch]) => {
-                this._init(confirmCh, ch);
+                const publisher = new ConfirmPublisher(confirmCh);
+
+                this._init(confirmCh, ch, publisher);
             });
     }
 
-    _init(confirmCh, ch) {
+    _init(confirmCh, ch, publisher) {
         return Promise.all([
             ch.assertQueue('reconnect_in', {durable: false}),
             confirmCh.assertQueue('reconnect_out', {durable: false})
@@ -30,16 +33,15 @@ class ConfirmService extends Service {
                         }
 
                         try {
-                            confirmCh.sendToQueue('reconnect_out', msg.content, {}, err => {
-                                    if (err) {
-                                        console.log('Message sending failed!');
-                                        console.error(err);
-                                    } else {
-                                        ch.ack(msg);
-                                        console.log(' [Service] Message sent', msg.content.toString());
-                                    }
-                                }
-                            );
+                            publisher.sendToQueue('reconnect_out', msg.content)
+                                .then(() => {
+                                    ch.ack(msg);
+                                    console.log(' [Service] Message sent', msg.content.toString());
+                                })
+                                .catch(err => {
+                                    console.log('Message sending failed!');
+                                    console.error(err);
+                                });
 
                         } catch (err) {
                             console.error(' [Service] Message wasn\'t sent due to error', err);

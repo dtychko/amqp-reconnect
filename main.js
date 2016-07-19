@@ -1,5 +1,4 @@
 const App = require('./app');
-const Service = require('./service');
 const ConfirmService = require('./confirmService');
 
 function startService(conn) {

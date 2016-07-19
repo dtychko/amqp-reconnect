@@ -1,4 +1,5 @@
 const {timeout, logErrors} = require('./utils');
+const {Publisher} = require('./publisher');
 
 class Service {
     constructor(conn) {
@@ -9,11 +10,12 @@ class Service {
     start() {
         return this._conn.createChannel()
             .then(ch => {
-                this._init(ch);
+                const publisher = new Publisher(ch);
+                this._init(ch, publisher);
             });
     }
 
-    _init(ch) {
+    _init(ch, publisher) {
         return Promise.all([
             ch.assertQueue('reconnect_in', {durable: false}),
             ch.assertQueue('reconnect_out', {durable: false})
@@ -29,7 +31,7 @@ class Service {
                         }
 
                         try {
-                            ch.sendToQueue('reconnect_out', msg.content);
+                            publisher.sendToQueue('reconnect_out', msg.content);
                             ch.ack(msg);
 
                             console.log(' [Service] Message sent', msg.content.toString());
