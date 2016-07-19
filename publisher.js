@@ -1,54 +1,45 @@
 const EventEmitter = require('events').EventEmitter;
 
 class ReadyState {
-    constructor(publisher, ch) {
-        this._ch = ch;
-        this._publisher = publisher;
+    constructor(context) {
+        this._context = context;
     }
 
     publish(message) {
-        const nextMessageWillBeSent = this._send(message);
+        const shouldGoPendingState = this._context.publish(message);
 
-        if (!nextMessageWillBeSent) {
+        if (!shouldGoPendingState) {
             this._goPendingState();
         }
     }
 
     publishMany(messages) {
         for (let i = 0; i < messages.length; i++) {
-            const nextMessageWillBeSent = this._send(messages[i]);
+            const shouldGoPendingState = this._context.publish(messages[i]);
 
-            if (!nextMessageWillBeSent) {
+            if (!shouldGoPendingState) {
                 messages.splice(0, i + 1);
                 this._goPendingState(messages);
                 return;
             }
         }
-
-        this._publisher.emit('empty');
-    }
-
-    _send({exchangeName, queueName, content, options, callback}) {
-        return this._ch.publish(exchangeName, queueName, content, options, callback);
     }
 
     _goPendingState(buffer = []) {
-        this._publisher._setState(new PendingState(this._publisher, this._ch, buffer));
+        this._context.setState(new PendingState(this._context, buffer));
         console.log(` [Publisher] Switched to PendingState (buffer size: ${buffer.length})`);
     }
 }
 
-
 class PendingState {
-    constructor(publisher, ch, buffer = []) {
-        this._ch = ch;
-        this._publisher = publisher;
+    constructor(context, buffer = []) {
+        this._context = context;
         this._buffer = buffer;
 
-        this._ch.once('drain', () => {
+        this._context.ch.once('drain', () => {
             console.log(` [Publisher] Channel 'drain' event (buffer size: ${this._buffer.length})`);
-            const state = new ReadyState(this._publisher, this._ch);
-            this._publisher._setState(state);
+            const state = new ReadyState(this._context);
+            this._context.setState(state);
             console.log(` [Publisher] Switched to ReadyState`);
             state.publishMany(this._buffer);
         });
@@ -56,52 +47,67 @@ class PendingState {
 
     publish(message) {
         this._buffer.push(message);
-
     }
 }
-
 
 class Publisher extends EventEmitter {
     constructor(ch) {
         super();
-        this._state = new ReadyState(this, ch);
+        this._ch = ch;
+        this._state = new ReadyState(this._context());
     }
 
-    publish(exchangeName, queueName, content, options, callback) {
-        this._state.publish({exchangeName, queueName, content, options, callback});
+    publish(exchange, routingKey, content, options) {
+        this._state.publish({exchange, routingKey, content, options});
     }
 
-    sendToQueue(queueName, content, options, callback) {
-        this.publish('', queueName, content, options, callback);
+    sendToQueue(queue, content, options) {
+        this.publish('', queue, content, options);
+    }
+
+    _publish({exchange, routingKey, content, options}) {
+        return this._ch.publish(exchange, routingKey, content, options);
     }
 
     _setState(state) {
         this._state = state;
     }
+
+    _context() {
+        return {
+            ch: this._ch,
+            setState: state => {
+                this._setState(state);
+            },
+            publish: message => {
+                return this._publish(message);
+            }
+        };
+    }
 }
 
-
 class ConfirmPublisher extends Publisher {
-    publish(exchangeName, queueName, content, options) {
+    publish(exchange, routingKey, content, options) {
         return new Promise((res, rej) => {
-            super.publish(
-                exchangeName,
-                queueName,
-                content,
-                options,
+            const callback =
                 err => {
                     if (err) {
                         rej(err);
                     } else {
                         res();
                     }
-                }
-            )
-        });
+                };
+
+            this._state.publish({exchange, routingKey, content, options, callback});
+        })
     }
 
-    sendToQueue(queueName, content, options) {
-        return this.publish('', queueName, content, options);
+    sendToQueue(queue, content, options) {
+        return this.publish('', queue, content, options);
+    }
+
+    _publish({exchange, routingKey, content, options, callback}) {
+        return this._ch.publish(exchange, routingKey, content, options, callback);
     }
 }
 

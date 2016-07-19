@@ -13,7 +13,6 @@ for (let i = 0; i < 100; i++) {
 const buffer = new Buffer(str);
 let connection;
 
-
 amqp.connect('amqp://192.168.99.100')
     .then(conn => {
         connection = conn;
@@ -24,22 +23,19 @@ amqp.connect('amqp://192.168.99.100')
         .then(() => ch))
     .then(ch => {
         const publisher = new ConfirmPublisher(ch);
-        let t = process.hrtime();
-
-        publisher.on('empty', () => {
-            t = process.hrtime(t);
-            console.log(` Publishing time: ${t} s`);
-
-            setTimeout(() => {
-                connection.close();
-            }, 3000);
-        });
+        let sent = 0;
 
         for (let i = 0; i < N; i++) {
             publisher.sendToQueue(QUEUE_NAME_1, buffer)
+                .then(() => {
+                    sent += 1;
+
+                    if (sent === N) {
+                        connection.close();
+                    }
+                })
                 .catch(err => {
-                    console.log('error while sending message');
-                    console.error(err);
+                    console.error('error while sending message', err);
                 });
         }
     })
